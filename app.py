@@ -17,6 +17,7 @@ AUTH_DATA = {
     'client_secret': CLIENT_SECRET
 }
 
+# Get the access token here
 response = requests.post(AUTH_URL, data=AUTH_DATA)
 access_token = response.json()['access_token']
 
@@ -32,7 +33,7 @@ blueprint_lib_response = requests.get(BLUEPRINT_LIB_URL, headers=head).text
 blueprint_list = blueprint_lib_response.split('\n')
 
 #remove the first element
-blueprint_list = blueprint_list[1:]
+blueprint_list = blueprint_list[1:500]
 print(f"Found {len(blueprint_list)} blueprints")
 
 #Create lists for the output
@@ -59,8 +60,9 @@ async def get_blueprint_data(session, bp_id):
             bp_name = bwl_utils.get_name(bp_json)
             space_name = bwl_utils.get_space_name(bp_json)
             lmd = bwl_utils.get_last_modified_date(bp_json)
+            age = bwl_utils.get_age(bp_json)
 
-            bp_record = {'ID': bp_id, 'name': bp_name, 'space': space_name, 'last-modified': lmd}
+            bp_record = {'ID': bp_id, 'name': bp_name, 'space': space_name, 'last-modified': lmd, 'age': age}
             bp_export.append(bp_record)
         except:
             bp_error = {'ID': bp_id}
@@ -70,7 +72,7 @@ asyncio.run(main())
 
 # Save the data
 data_file = open('data_file.csv', 'w')
-header = ['ID', 'Name', 'Space', 'LMD']
+header = ['ID', 'Name', 'Space', 'LMD', 'Age in Days']
 csv_writer = csv.writer(data_file)
 row_count = 0
 for bp_record in bp_export:
