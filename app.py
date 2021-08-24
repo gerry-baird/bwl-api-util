@@ -4,10 +4,23 @@ import asyncio
 import csv
 import bwl_utils
 import time
+import logging
 from keys import CLIENT_SECRET
 from keys import CLIENT_ID
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s:%(levelname)s%(name)s:%(message)s')
+file_handler = logging.FileHandler('bwl-util.log')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+logger.setLevel(logging.DEBUG)
+
+
 start_time = time.time()
+logger.info('Starting')
+
+
 
 AUTH_URL = "https://us001.blueworkslive.com/oauth/token"
 
@@ -33,7 +46,7 @@ blueprint_lib_response = requests.get(BLUEPRINT_LIB_URL, headers=head).text
 blueprint_list = blueprint_lib_response.split('\n')
 
 #remove the first element
-blueprint_list = blueprint_list[1:500]
+blueprint_list = blueprint_list[1:5]
 print(f"Found {len(blueprint_list)} blueprints")
 
 #Create lists for the output
@@ -56,17 +69,31 @@ async def get_blueprint_data(session, bp_id):
 
     async with session.get(url, headers=head) as response:
         try:
-            bp_json = await response.json()
-            bp_name = bwl_utils.get_name(bp_json)
-            space_name = bwl_utils.get_space_name(bp_json)
-            lmd = bwl_utils.get_last_modified_date(bp_json)
-            age = bwl_utils.get_age(bp_json)
+            status = response.status
+            if status == 200:
+                bp_json = await response.json()
+                bp_name = bwl_utils.get_name(bp_json)
+                space_name = bwl_utils.get_space_name(bp_json)
+                lmd = bwl_utils.get_last_modified_date(bp_json)
+                age = bwl_utils.get_age(bp_json)
 
-            bp_record = {'ID': bp_id, 'name': bp_name, 'space': space_name, 'last-modified': lmd, 'age': age}
-            bp_export.append(bp_record)
-        except:
+                bp_record = {'ID': bp_id, 'name': bp_name, 'space': space_name, 'last-modified': lmd, 'age': age}
+                bp_export.append(bp_record)
+
+                message = f"Finished processing blueprint ID : {bp_id}, Space : {space_name}, Name : {bp_name}"
+                logger.debug(message)
+            else:
+                message = f"Error processing blueprint : {bp_id}, response code from BWL : {status}"
+                logger.warning(message)
+                bp_error = {'ID': bp_id}
+                bp_errors.append(bp_error)
+
+        except Exception as e:
             bp_error = {'ID': bp_id}
             bp_errors.append(bp_error)
+            message = f"Unexpected error processing blueprint : {bp_id}"
+            logger.error(message)
+            logger.error(e)
 
 asyncio.run(main())
 
@@ -100,3 +127,4 @@ error_file.close()
 
 
 print("--- %s seconds ---" % (time.time() - start_time))
+logger.info('Finished')
