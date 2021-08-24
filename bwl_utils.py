@@ -43,6 +43,17 @@ def get_age(blueprint) -> int:
 
     return blueprint_age
 
+def get_days_since_published(blueprint):
+    pub_state = blueprint['published-state']
+    current_date = datetime.now(timezone.utc)
+
+    if pub_state == "published":
+        pub_date = datetime.strptime(blueprint['published-date'], "%Y-%m-%dT%H:%M:%S.%f%z")
+#        current_date = (current_date, "%Y-%m-%dT%H:%M:%S.%f%z")
+        dsp = abs((current_date - pub_date).days)
+    else:
+        dsp = 'N/A'
+    return dsp
 
 
 
