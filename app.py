@@ -80,7 +80,7 @@ blueprint_lib_response = requests.get(BLUEPRINT_LIB_URL, headers=head).text
 blueprint_list = blueprint_lib_response.split('\n')
 
 #remove the first element
-blueprint_list = blueprint_list[1:5]
+blueprint_list = blueprint_list[1:]
 print(f"Found {len(blueprint_list)} blueprints")
 
 #Create lists for the output
