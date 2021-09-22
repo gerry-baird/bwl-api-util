@@ -5,12 +5,11 @@ import csv
 import bwl_utils
 import time
 import logging
-from keys import CLIENT_SECRET
-from keys import CLIENT_ID
+import getpass
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s:%(levelname)s%(name)s:%(message)s')
+formatter = logging.Formatter('%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
 file_handler = logging.FileHandler('bwl-util.log')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
@@ -19,10 +18,39 @@ logger.setLevel(logging.DEBUG)
 
 start_time = time.time()
 logger.info('Starting')
+# Get user's input for blueworks live URL, client_id and client_secret
+try:
+    URL = input("Please enter your blueworks live URL (e.g. https://ibm.blueworkslive.com): ")
+    if not URL:
+        raise ValueError('Error: Blank URL, the application is stopped')
+except ValueError as e:
+    logger.warning(e)
+    print(e)
+    exit()
 
+try:
+    CLIENT_ID = input("Please enter your Client ID: ")
+    if not CLIENT_ID:
+        raise ValueError('Error: Blank Client ID, the application is stopped')
+except ValueError as e:
+    logger.warning(e)
+    print(e)
+    exit()
 
+try:
+    CLIENT_SECRET = getpass.getpass("Please enter your Client Secret: ")
+    if not CLIENT_SECRET:
+        raise ValueError('Error: Blank Client Secret, the application is stopped')
+except ValueError as e:
+    logger.warning(e)
+    print(e)
+    exit()
 
-AUTH_URL = "https://us001.blueworkslive.com/oauth/token"
+# Remove spaces from the beginning and at the end of the input string
+URL = URL.strip()
+AUTH_URL = URL + "/oauth/token"
+CLIENT_ID = CLIENT_ID.strip()
+CLIENT_SECRET = CLIENT_SECRET.strip()
 
 AUTH_DATA = {
     'grant_type': 'client_credentials',
@@ -31,13 +59,19 @@ AUTH_DATA = {
 }
 
 # Get the access token here
-response = requests.post(AUTH_URL, data=AUTH_DATA)
-access_token = response.json()['access_token']
+try:
+    response = requests.post(AUTH_URL, data=AUTH_DATA)
+    access_token = response.json()['access_token']
+    if not access_token:
+        raise ValueError('Access token could not be retrieved, please check your input')
+except ValueError as e:
+    logger.warning(e)
+    print(e)
+    exit()
 
 print(f"Access Token : {access_token}")
 
-
-BLUEPRINT_LIB_URL = "https://us001.blueworkslive.com/scr/api/LibraryArtifact?type=BLUEPRINT&returnFields=ID"
+BLUEPRINT_LIB_URL = URL + "/scr/api/LibraryArtifact?type=BLUEPRINT&returnFields=ID"
 head = {
     'Authorization': 'Bearer {}'.format(access_token),
     # 'X-On-Behalf-Of' : 'mark_ketteman@uk.ibm.com'
@@ -65,9 +99,9 @@ async def main():
         await asyncio.gather(*tasks)
 
 async def get_blueprint_data(session, bp_id):
-    url = "https://us001.blueworkslive.com/bwl/blueprints/" + bp_id
+    bp_url = URL + "/bwl/blueprints/" + bp_id
 
-    async with session.get(url, headers=head) as response:
+    async with session.get(bp_url, headers=head) as response:
         try:
             status = response.status
             if status == 200:

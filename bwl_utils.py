@@ -3,7 +3,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s:%(levelname)s%(name)s:%(message)s')
+formatter = logging.Formatter('%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
 file_handler = logging.FileHandler('bwl-util.log')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
@@ -55,5 +55,14 @@ def get_days_since_published(blueprint):
         dsp = 'N/A'
     return dsp
 
+def get_published_state(blueprint):
+    pub_state = blueprint['published-state']
+    return pub_state
 
+def get_published_date(blueprint):
+    pub_date = 'N/A'
+    pub_state = blueprint['published-state']
+    if pub_state == "published":
+        pub_date = blueprint['published-date']
+    return pub_date
 
