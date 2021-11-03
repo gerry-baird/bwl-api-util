@@ -1,12 +1,24 @@
 import requests
 import aiohttp
+import yaml
+from yaml.loader import SafeLoader
 import asyncio
 import csv
+import sys
 import bwl_utils
 import time
 import logging
-import getpass
+import argparse
 
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-c", "--config", help="config file name")
+args = parser.parse_args()
+config_filename = args.config
+
+if config_filename is None:
+    # Default config filename
+    config_filename = "config.yaml"
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -16,47 +28,30 @@ file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 logger.setLevel(logging.DEBUG)
 
+# Load the config
+try:
+    with open(config_filename, 'r') as config_file:
+        config = yaml.load(config_file, Loader=SafeLoader)
+except FileNotFoundError as e:
+    msg = "Cannot find config file : config.yaml or the config file specified in arguments"
+    print(msg)
+    logger.error(msg)
+    sys.exit("BWL API Util - aborting.")
+
 
 start_time = time.time()
 logger.info('Starting')
-# Get user's input for blueworks live URL, client_id and client_secret
-try:
-    URL = input("Please enter your blueworks live URL (e.g. https://ibm.blueworkslive.com): ")
-    if not URL:
-        raise ValueError('Error: Blank URL, the application is stopped')
-except ValueError as e:
-    logger.warning(e)
-    print(e)
-    exit()
+# Get config for blueworks live URL, client_id and client_secret
+ROOT_URL = config['root-url']
+AUTH_URL = ROOT_URL + "/oauth/token"
+CLIENT_REPORTING_ID = config['artefact-reporting-client-id']
+CLIENT_REPORTING_SECRET = config['artefact-reporting-client-secret']
 
-try:
-    CLIENT_ID = input("Please enter your Client ID: ")
-    if not CLIENT_ID:
-        raise ValueError('Error: Blank Client ID, the application is stopped')
-except ValueError as e:
-    logger.warning(e)
-    print(e)
-    exit()
-
-try:
-    CLIENT_SECRET = getpass.getpass("Please enter your Client Secret: ")
-    if not CLIENT_SECRET:
-        raise ValueError('Error: Blank Client Secret, the application is stopped')
-except ValueError as e:
-    logger.warning(e)
-    print(e)
-    exit()
-
-# Remove spaces from the beginning and at the end of the input string
-URL = URL.strip()
-AUTH_URL = URL + "/oauth/token"
-CLIENT_ID = CLIENT_ID.strip()
-CLIENT_SECRET = CLIENT_SECRET.strip()
 
 AUTH_DATA = {
     'grant_type': 'client_credentials',
-    'client_id': CLIENT_ID,
-    'client_secret': CLIENT_SECRET
+    'client_id': CLIENT_REPORTING_ID,
+    'client_secret': CLIENT_REPORTING_SECRET
 }
 
 # Get the access token here
@@ -72,9 +67,9 @@ except ValueError as e:
 
 print(f"Access Token : {access_token}")
 
-BLUEPRINT_LIB_URL = URL + "/scr/api/LibraryArtifact?type=BLUEPRINT&returnFields=ID"
+BLUEPRINT_LIB_URL = ROOT_URL + "/scr/api/LibraryArtifact?type=BLUEPRINT&returnFields=ID"
 head = {
-    'Authorization': 'Bearer {}'.format(access_token),
+    'Authorization': 'Bearer {}'.format(access_token)
     # 'X-On-Behalf-Of' : 'mark_ketteman@uk.ibm.com'
 }
 blueprint_lib_response = requests.get(BLUEPRINT_LIB_URL, headers=head).text
@@ -88,6 +83,7 @@ print(f"Found {len(blueprint_list)} blueprints")
 bp_export = []
 bp_errors = []
 
+
 async def main():
     connector = aiohttp.TCPConnector(limit=5)
     async with aiohttp.ClientSession(connector=connector) as session:
@@ -100,9 +96,9 @@ async def main():
         await asyncio.gather(*tasks)
 
 async def get_blueprint_data(session, bp_id):
-    bp_url = URL + "/bwl/blueprints/" + bp_id
+    bp_url = ROOT_URL + "/bwl/blueprints/" + bp_id
 
-    async with session.get(bp_url, headers=head) as response:
+    async with session.get(bp_url, headers=head, ssl=False) as response:
         try:
             status = response.status
             if status == 200:
