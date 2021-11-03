@@ -12,9 +12,7 @@ The easiest way is to download and unpack the zip file.
 From the command line where app.py has been extracted just execute the following commands
 to install the needed libraries.
 
-`pip3 install requests`
-
-`pip3 install aiohttp`
+`pip3 install -r requirements.txt`
 
 Then run the following command :
 
