@@ -9,6 +9,7 @@ import bwl_utils
 import time
 import logging
 import argparse
+from tqdm import tqdm
 
 
 parser = argparse.ArgumentParser()
@@ -76,7 +77,8 @@ blueprint_lib_response = requests.get(BLUEPRINT_LIB_URL, headers=head).text
 blueprint_list = blueprint_lib_response.split('\n')
 
 #remove the first element
-blueprint_list = blueprint_list[1:]
+blueprint_list = blueprint_list[1:-1]
+
 print(f"Found {len(blueprint_list)} blueprints")
 
 #Create lists for the output
@@ -88,14 +90,16 @@ async def main():
     connector = aiohttp.TCPConnector(limit=5)
     async with aiohttp.ClientSession(connector=connector) as session:
         tasks = []
+        pbar = tqdm(total=len(blueprint_list))
         for bp_id in blueprint_list:
             bp_id = bp_id.strip('/"')
-            task = asyncio.ensure_future(get_blueprint_data(session, bp_id))
+            task = asyncio.ensure_future(get_blueprint_data(session, bp_id, pbar))
             tasks.append(task)
 
         await asyncio.gather(*tasks)
+        pbar.close()
 
-async def get_blueprint_data(session, bp_id):
+async def get_blueprint_data(session, bp_id, pbar):
     bp_url = ROOT_URL + "/bwl/blueprints/" + bp_id
 
     async with session.get(bp_url, headers=head, ssl=False) as response:
@@ -113,11 +117,13 @@ async def get_blueprint_data(session, bp_id):
 
                 message = f"Finished processing blueprint ID : {bp_id}, Space : {space_name}, Name : {bp_name}"
                 logger.debug(message)
+                pbar.update(1)
             else:
                 message = f"Error processing blueprint : {bp_id}, response code from BWL : {status}"
                 logger.warning(message)
                 bp_error = {'ID': bp_id}
                 bp_errors.append(bp_error)
+                pbar.update(1)
 
         except Exception as e:
             bp_error = {'ID': bp_id}
