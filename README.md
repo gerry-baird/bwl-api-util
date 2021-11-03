@@ -18,4 +18,4 @@ to install the needed libraries.
 
 Then run the following command :
 
-`python3 app.py`
+`python3 blueprint-summary.py`

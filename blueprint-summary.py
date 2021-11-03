@@ -7,6 +7,7 @@ import time
 import logging
 import getpass
 
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
@@ -133,6 +134,8 @@ asyncio.run(main())
 
 # Save the data
 data_file = open('data_file.csv', 'w')
+
+# Standard headers
 header = ['ID', 'Name', 'Space', 'LMD', 'Age in Days']
 csv_writer = csv.writer(data_file)
 row_count = 0
