@@ -1,8 +1,8 @@
 import requests
+import asyncio
 import aiohttp
 import yaml
 from yaml.loader import SafeLoader
-import asyncio
 import csv
 import sys
 import bwl_utils
@@ -40,16 +40,14 @@ except FileNotFoundError as e:
     sys.exit("BWL API Util - aborting.")
 
 
-start_time = time.time()
-logger.info('Starting')
 # Get config for blueworks live URL, client_id and client_secret
 ROOT_URL = config['root-url']
 AUTH_URL = ROOT_URL + "/oauth/token"
 CLIENT_REPORTING_ID = config['artefact-reporting-client-id']
 CLIENT_REPORTING_SECRET = config['artefact-reporting-client-secret']
+BLUEPRINT_LIB_URL = ROOT_URL + "/scr/api/LibraryArtifact?type=BLUEPRINT&returnFields=ID"
 
-
-AUTH_DATA = {
+CLIENT_REPORTING_AUTH_DATA = {
     'grant_type': 'client_credentials',
     'client_id': CLIENT_REPORTING_ID,
     'client_secret': CLIENT_REPORTING_SECRET
@@ -57,7 +55,7 @@ AUTH_DATA = {
 
 # Get the access token here
 try:
-    response = requests.post(AUTH_URL, data=AUTH_DATA)
+    response = requests.post(AUTH_URL, data=CLIENT_REPORTING_AUTH_DATA)
     access_token = response.json()['access_token']
     if not access_token:
         raise ValueError('Access token could not be retrieved, please check your input')
@@ -66,41 +64,30 @@ except ValueError as e:
     print(e)
     exit()
 
-print(f"Access Token : {access_token}")
-
-BLUEPRINT_LIB_URL = ROOT_URL + "/scr/api/LibraryArtifact?type=BLUEPRINT&returnFields=ID"
-head = {
-    'Authorization': 'Bearer {}'.format(access_token)
-    # 'X-On-Behalf-Of' : 'mark_ketteman@uk.ibm.com'
-}
-blueprint_lib_response = requests.get(BLUEPRINT_LIB_URL, headers=head).text
-blueprint_list = blueprint_lib_response.split('\n')
-
-#remove the first element
-blueprint_list = blueprint_list[1:-1]
-
-print(f"Found {len(blueprint_list)} blueprints")
-
-#Create lists for the output
-bp_export = []
-bp_errors = []
+CLIENT_REPORTING_ACCESS_TOKEN = access_token
 
 
-async def main():
+async def get_blueprint_summaries(blueprint_list, bp_export, bp_errors):
     connector = aiohttp.TCPConnector(limit=5)
     async with aiohttp.ClientSession(connector=connector) as session:
         tasks = []
         pbar = tqdm(total=len(blueprint_list))
         for bp_id in blueprint_list:
             bp_id = bp_id.strip('/"')
-            task = asyncio.ensure_future(get_blueprint_data(session, bp_id, pbar))
+            task = asyncio.create_task(get_blueprint_data(session, bp_id, bp_export, bp_errors, pbar))
             tasks.append(task)
 
         await asyncio.gather(*tasks)
         pbar.close()
 
-async def get_blueprint_data(session, bp_id, pbar):
+
+async def get_blueprint_data(session, bp_id, bp_export, bp_errors, pbar):
     bp_url = ROOT_URL + "/bwl/blueprints/" + bp_id
+
+    auth_value = f"Bearer {CLIENT_REPORTING_ACCESS_TOKEN}"
+    head = {
+        'Authorization': auth_value
+    }
 
     async with session.get(bp_url, headers=head, ssl=False) as response:
         try:
@@ -117,13 +104,12 @@ async def get_blueprint_data(session, bp_id, pbar):
 
                 message = f"Finished processing blueprint ID : {bp_id}, Space : {space_name}, Name : {bp_name}"
                 logger.debug(message)
-                pbar.update(1)
+
             else:
                 message = f"Error processing blueprint : {bp_id}, response code from BWL : {status}"
                 logger.warning(message)
                 bp_error = {'ID': bp_id}
                 bp_errors.append(bp_error)
-                pbar.update(1)
 
         except Exception as e:
             bp_error = {'ID': bp_id}
@@ -132,38 +118,73 @@ async def get_blueprint_data(session, bp_id, pbar):
             logger.error(message)
             logger.error(e)
 
-asyncio.run(main())
-
-# Save the data
-data_file = open('data_file.csv', 'w')
-
-# Standard headers
-header = ['ID', 'Name', 'Space', 'LMD', 'Age in Days']
-csv_writer = csv.writer(data_file)
-row_count = 0
-for bp_record in bp_export:
-    if row_count == 0:
-        csv_writer.writerow(header)
-        row_count += 1
-
-    csv_writer.writerow(bp_record.values())
-
-data_file.close()
-
-#Save any errors
-error_file = open('error_file.csv', 'w')
-header = ['ID']
-csv_writer = csv.writer(error_file)
-row_count = 0
-for bp_record in bp_errors:
-    if row_count == 0:
-        csv_writer.writerow(header)
-        row_count += 1
-
-    csv_writer.writerow(bp_record.values())
-
-error_file.close()
+        finally:
+            pbar.update(1)
 
 
-print("--- %s seconds ---" % (time.time() - start_time))
-logger.info('Finished')
+def get_blueprint_list():
+    auth_value = f"Bearer {CLIENT_REPORTING_ACCESS_TOKEN}"
+    head = {
+        'Authorization': auth_value
+    }
+
+    blueprint_lib_response = requests.get(BLUEPRINT_LIB_URL, headers=head).text
+    blueprint_list = blueprint_lib_response.split('\n')
+
+    # remove the first & last elements
+    # First is header, last is blank due to the final line break
+    blueprint_list = blueprint_list[1:-1]
+
+    return blueprint_list
+
+
+def main():
+    start_time = time.time()
+    logger.info('Starting')
+
+    blueprint_list = get_blueprint_list()
+
+    print(f"Found {len(blueprint_list)} blueprints")
+
+    # Create lists for the output
+    bp_export = []
+    bp_errors = []
+
+    asyncio.run(get_blueprint_summaries(blueprint_list, bp_export, bp_errors))
+
+    # Save the data
+    data_file = open('data_file.csv', 'w')
+
+    # Standard headers
+    header = ['ID', 'Name', 'Space', 'LMD', 'Age in Days']
+    csv_writer = csv.writer(data_file)
+    row_count = 0
+    for bp_record in bp_export:
+        if row_count == 0:
+            csv_writer.writerow(header)
+            row_count += 1
+
+        csv_writer.writerow(bp_record.values())
+
+    data_file.close()
+
+    # Save any errors
+    error_file = open('error_file.csv', 'w')
+    header = ['ID']
+    csv_writer = csv.writer(error_file)
+    row_count = 0
+    for bp_record in bp_errors:
+        if row_count == 0:
+            csv_writer.writerow(header)
+            row_count += 1
+
+        csv_writer.writerow(bp_record.values())
+
+    error_file.close()
+
+    print("--- %s seconds ---" % (time.time() - start_time))
+    logger.info('Finished')
+
+
+if __name__ == "__main__":
+    main()
