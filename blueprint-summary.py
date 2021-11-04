@@ -27,7 +27,7 @@ formatter = logging.Formatter('%(asctime)s %(levelname)-8s [%(filename)s:%(linen
 file_handler = logging.FileHandler('bwl-util.log')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 # Load the config
 try:
@@ -140,11 +140,14 @@ def get_blueprint_list():
 
 def main():
     start_time = time.time()
-    logger.info('Starting')
+    msg = 'Starting BWL Summary Extract'
+    print(msg)
+    logger.info(msg)
 
     blueprint_list = get_blueprint_list()
-
-    print(f"Found {len(blueprint_list)} blueprints")
+    msg = f"Found {len(blueprint_list)} blueprints"
+    print(msg)
+    logger.info(msg)
 
     # Create lists for the output
     bp_export = []
@@ -152,35 +155,19 @@ def main():
 
     asyncio.run(get_blueprint_summaries(blueprint_list, bp_export, bp_errors))
 
-    # Save the data
-    data_file = open('data_file.csv', 'w')
+    # Save the data, use a context manager to handle the closure
+    with open('data_file.csv', 'w') as data_file:
 
-    # Standard headers
-    header = ['ID', 'Name', 'Space', 'LMD', 'Age in Days']
-    csv_writer = csv.writer(data_file)
-    row_count = 0
-    for bp_record in bp_export:
-        if row_count == 0:
-            csv_writer.writerow(header)
-            row_count += 1
+        # Standard headers
+        header = ['ID', 'Name', 'Space', 'LMD', 'Age in Days']
+        csv_writer = csv.writer(data_file)
+        row_count = 0
+        for bp_record in bp_export:
+            if row_count == 0:
+                csv_writer.writerow(header)
+                row_count += 1
 
-        csv_writer.writerow(bp_record.values())
-
-    data_file.close()
-
-    # Save any errors
-    error_file = open('error_file.csv', 'w')
-    header = ['ID']
-    csv_writer = csv.writer(error_file)
-    row_count = 0
-    for bp_record in bp_errors:
-        if row_count == 0:
-            csv_writer.writerow(header)
-            row_count += 1
-
-        csv_writer.writerow(bp_record.values())
-
-    error_file.close()
+            csv_writer.writerow(bp_record.values())
 
     print("--- %s seconds ---" % (time.time() - start_time))
     logger.info('Finished')

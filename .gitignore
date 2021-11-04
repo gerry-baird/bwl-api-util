@@ -2,7 +2,7 @@
 # Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
 
 # BWL API Stuff
-config_private.yaml
+*private.yaml
 data_file.csv
 error_file.csv
 bwl-util.log
@@ -79,3 +79,4 @@ fabric.properties
 
 # Android studio 3.1+ serialized cache file
 .idea/caches/build_file_checksums.ser
+
