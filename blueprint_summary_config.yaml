@@ -1,0 +1,10 @@
+# Mandatory config
+root-url: https://ibm.blueworkslive.com
+
+artefact-reporting-client-id: <reporting-client-id-here>
+artefact-reporting-client-secret: <secret-here>
+
+artefact-authoring-client-id: <authoring-client-id-here>
+artefact-authoring-client-secret: <secret-here>
+
+thread-count: 5

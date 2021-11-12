@@ -16,4 +16,4 @@ to install the needed libraries.
 
 Then run the following command :
 
-`python3 blueprint-summary.py`
+`python3 blueprint-summary.py -c blueprint_summary_config.yaml`
